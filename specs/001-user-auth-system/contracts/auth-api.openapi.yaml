@@ -1,0 +1,252 @@
+openapi: 3.0.3
+info:
+  title: User Authentication API
+  version: 0.1.0
+  description: |
+    HTTP contract for the user-authentication feature (spec 001-user-auth-system).
+    All endpoints accept and return `application/json`. All times are ISO-8601 UTC.
+servers:
+  - url: https://api.example.com
+paths:
+  /auth/register:
+    post:
+      operationId: register
+      summary: Register a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Account created and signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409':
+          description: Email already registered (intentionally generic to avoid enumeration)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/login:
+    post:
+      operationId: login
+      summary: Sign in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401':
+          description: Invalid credentials (generic, non-enumerating)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Invalidate the current session
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Session revoked }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /auth/me:
+    get:
+      operationId: me
+      summary: Return the authenticated user
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /auth/password-reset/request:
+    post:
+      operationId: requestPasswordReset
+      summary: Request a password-reset email
+      description: |
+        Always responds 202 regardless of whether the email is registered,
+        to avoid account enumeration (FR-010).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResetRequestRequest' }
+      responses:
+        '202':
+          description: Generic acknowledgement (sent only if address is registered)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AckResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/password-reset/confirm:
+    post:
+      operationId: confirmPasswordReset
+      summary: Set a new password using a reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ResetConfirmRequest' }
+      responses:
+        '204':
+          description: Password updated; all existing sessions revoked
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '410':
+          description: Reset token is expired, already used, or superseded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Email:
+      type: string
+      format: email
+      maxLength: 254
+    Password:
+      type: string
+      minLength: 8
+      maxLength: 200
+      description: Plaintext password; transmitted only over TLS, never logged.
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      additionalProperties: false
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+        password: { $ref: '#/components/schemas/Password' }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      additionalProperties: false
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+        password: { $ref: '#/components/schemas/Password' }
+
+    ResetRequestRequest:
+      type: object
+      required: [email]
+      additionalProperties: false
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+
+    ResetConfirmRequest:
+      type: object
+      required: [token, newPassword]
+      additionalProperties: false
+      properties:
+        token:
+          type: string
+          minLength: 32
+          maxLength: 64
+        newPassword: { $ref: '#/components/schemas/Password' }
+
+    SessionResponse:
+      type: object
+      required: [token, expiresAt, user]
+      additionalProperties: false
+      properties:
+        token:
+          type: string
+          description: JWT bearer token. Carry as `Authorization: Bearer <token>`.
+        expiresAt:
+          type: string
+          format: date-time
+          description: Session expiry (issued-at + 24h).
+        user: { $ref: '#/components/schemas/UserResponse' }
+
+    UserResponse:
+      type: object
+      required: [id, email]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+
+    AckResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        message:
+          type: string
+          example: If that email is registered, a reset link has been sent.
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - validation_failed
+                - invalid_credentials
+                - email_taken
+                - unauthenticated
+                - reset_token_invalid
+                - rate_limited
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  path: { type: string }
+                  message: { type: string }
+
+  responses:
+    ValidationError:
+      description: Request body failed validation
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthenticated:
+      description: Missing, invalid, expired, or revoked session
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    RateLimited:
+      description: Too many requests; retry after the cool-down
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds until the next request will be accepted.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
