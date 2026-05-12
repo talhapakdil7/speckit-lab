@@ -1,245 +1,295 @@
 ---
-description: "Task list for User Authentication System (feature 001-user-auth-system)"
+description: 'Task list for User Authentication System (feature 001-user-auth-system)'
 ---
 
 # Tasks: User Authentication System
 
 **Input**: Design documents from `/specs/001-user-auth-system/`
-**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/auth-api.openapi.yaml, quickstart.md
+**Prerequisites**: plan.md, spec.md, data-model.md, contracts/auth-api.openapi.yaml, quickstart.md
 
-**Tests**: REQUIRED. The project constitution (principle III, NON-NEGOTIABLE) mandates the testing pyramid with ≥80% line/branch coverage on business logic. Test tasks are first-class deliverables in every story.
+**Tests**: Tests are **REQUIRED** per constitution Principle III (NON-NEGOTIABLE) §1 (TDD). Every implementation task in Phases 3–5 MUST be preceded by a failing test task (RED) and followed by a refactor checkpoint.
 
-**Organization**: Tasks are grouped by user story (from `spec.md`) so each story can be implemented, tested, and demoed independently.
+**Organization**: Tasks are grouped by user story. Stories are mapped from `spec.md`:
 
-## Format: `[ID] [P?] [Story] Description`
+- **US1** = Register a new account (P1) — MVP
+- **US2** = Sign in & 24-hour session, sign out (P1)
+- **US3** = Password reset via email (P2)
 
-- **[P]**: Can run in parallel (touches a different file and depends only on already-completed tasks)
-- **[Story]**: Maps a task to a specific user story (US1 / US2 / US3). Setup, Foundational, and Polish phases carry no story label.
-- Every implementation task names an exact file path under the layout in `plan.md`.
+## Format
+
+`- [ ] [TaskID] [P?] [Story?] Description with file path`
+
+- `[P]` — parallelizable (different files, no incomplete deps)
+- `[USx]` — user-story label (Phases 3–5 only)
+- File paths follow plan.md project structure.
 
 ## Path Conventions
 
-Single Node/TypeScript backend project per `plan.md` "Structure Decision":
+Single backend project at repository root:
 
-- Source: `src/...`
-- Tests: `tests/unit/`, `tests/integration/`, `tests/e2e/`
-- Migrations: `src/db/migrations/`
+- Source: `src/**`
+- Unit tests mirror `src/`: `tests/unit/<mirror>/**.test.ts`
+- Integration tests grouped by feature: `tests/integration/**.test.ts`
+- E2E tests grouped by user journey: `tests/e2e/**.spec.ts`
+- Fixtures: `tests/fixtures/**.ts`
+- Helpers: `tests/**/helpers/**.ts`
+
+(Per constitution §3 Test Types & Organization, §4 Naming Conventions, §13 Tools & Frameworks.)
 
 ---
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-**Purpose**: Bootstrap the empty repository into a runnable, lint-clean, type-checked Node + TypeScript project that matches the constitution's tooling baseline.
+**Purpose**: Tooling baseline required by the constitution before any test or feature work.
 
-- [ ] T001 Create the directory skeleton from `plan.md` (`src/{config,db/{migrations,repositories},services,routes,middleware,lib}`, `tests/{unit,integration,e2e,integration/helpers}`) so subsequent tasks have stable paths.
-- [ ] T002 Initialize the npm project: write `package.json` with Node 20 engine, `tsconfig.json` enabling every strict flag listed in constitution principle II, `.nvmrc` pinning Node 20, and `.gitignore` (node_modules, dist, coverage, .env, tmp/emails).
-- [ ] T003 Install runtime deps in `package.json` and lock: `express`, `pg`, `bcrypt`, `jsonwebtoken`, `zod`, `express-rate-limit`, `nodemailer`, `pino`, `pino-http`, `node-pg-migrate`, `dotenv`.
-- [ ] T004 Install dev deps in `package.json` and lock: `typescript`, `ts-node-dev`, `@types/node`, `@types/express`, `@types/bcrypt`, `@types/jsonwebtoken`, `@types/pg`, `@types/nodemailer`, `jest`, `ts-jest`, `@types/jest`, `supertest`, `@types/supertest`, `eslint`, `@typescript-eslint/parser`, `@typescript-eslint/eslint-plugin`, `eslint-plugin-jsdoc`, `prettier`, `eslint-config-prettier`.
-- [ ] T005 [P] Configure ESLint + Prettier: write `.eslintrc.cjs` enabling `@typescript-eslint/recommended`, `plugin:jsdoc/recommended-typescript`, and `eslint-config-prettier`; write `.prettierrc.json`; add `.eslintignore` and `.prettierignore`.
-- [ ] T006 [P] Configure Jest in `jest.config.ts`: `ts-jest` preset, projects for `unit`, `integration`, `e2e`, `coverageThreshold` of 80% lines and 80% branches scoped to `src/services/**`, `src/db/repositories/**`, `src/middleware/**` (excluding `src/index.ts` and `src/db/migrations/**`).
-- [ ] T007 [P] Add npm scripts to `package.json`: `dev` (ts-node-dev `src/index.ts`), `build` (tsc), `start` (node dist/index.js), `lint`, `format`, `format:check`, `typecheck`, `test`, `test:unit`, `test:integration`, `test:e2e`, `db:migrate`, `db:migrate:create`.
-- [ ] T008 [P] Author `.env.example` listing every variable read by the app (`DATABASE_URL`, `JWT_SECRET`, `BCRYPT_COST`, `PUBLIC_URL`, `SMTP_URL`, `PORT`) with safe defaults from `quickstart.md`.
+- [X] T001 Verify project structure exists per plan.md (`src/`, `tests/unit/`, `tests/integration/`, `tests/e2e/`, `tests/fixtures/`); create any missing directories
+- [X] T002 [P] Confirm `tsconfig.json` enables every strict flag listed in Principle II (`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, etc.) and `npm run typecheck` exits 0
+- [X] T003 [P] Configure ESLint at repo root (`.eslintrc.cjs`) with `@typescript-eslint`, `eslint-plugin-jsdoc`, `eslint-plugin-jest`, and `eslint-config-prettier`; enforce rules `expect-expect`, `valid-expect`, `no-conditional-expect`, `no-standalone-expect`, `no-identical-title`, `no-disabled-tests` (constitution §7, §13)
+- [X] T004 [P] Configure Prettier (`.prettierrc`) and verify `npm run format:check` is wired to CI
+- [X] T005 Configure Jest projects in `jest.config.ts` with three projects: `unit` (`<rootDir>/tests/unit/**/*.test.ts`), `integration` (`<rootDir>/tests/integration/**/*.test.ts`), `e2e` (`<rootDir>/tests/e2e/**/*.spec.ts`); add `coverageThreshold.global = { lines: 80, branches: 75 }` (constitution §3, §13)
+- [ ] T006 [P] Add Stryker config `stryker.conf.mjs` (`@stryker-mutator/core`, `@stryker-mutator/jest-runner`) with `thresholds.high=80, thresholds.low=75, thresholds.break=75`; add `test:mutation` npm script (constitution §2, §13)
+- [ ] T007 [P] Install and wire `husky` + `lint-staged` pre-commit hook (`.husky/pre-commit`) running `typecheck` → `lint` → `test:unit` (constitution §13 pre-commit contract)
+- [X] T008 [P] Add `.env.example` matching quickstart.md (DATABASE_URL, JWT_SECRET, BCRYPT_COST, PUBLIC_URL, SMTP_URL, PORT)
+
+**Checkpoint**: `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test` all run (even with empty test suite) and exit 0.
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Cross-cutting infrastructure that every user story depends on (config loading, DB pool, logger, error model, validation middleware, rate-limit middleware, app wiring, auth middleware shell, schema migrations). Until this phase is green, no user story can ship.
+**Purpose**: Core infrastructure shared by ALL user stories. Must complete before Phase 3.
 
-**⚠️ CRITICAL**: No work in Phase 3+ may start until every task here is complete and `npm run typecheck && npm run lint && npm test` passes against an empty business surface.
+**⚠️ CRITICAL**: No user-story work begins until this phase is complete.
 
-- [ ] T009 Implement typed env loader in `src/config/env.ts`: zod schema → exported `Env` object; throws on startup if any required var is missing or `JWT_SECRET` is shorter than 32 bytes.
-- [ ] T010 [P] Implement pino logger in `src/lib/logger.ts` with redaction paths for `req.headers.authorization`, `req.body.password`, `req.body.newPassword`, `req.body.token`, `res.headers["set-cookie"]` (FR-017).
-- [ ] T011 [P] Define domain error hierarchy in `src/lib/errors.ts`: base `DomainError` plus `ValidationError`, `InvalidCredentialsError`, `EmailTakenError`, `UnauthenticatedError`, `ResetTokenInvalidError`, `RateLimitedError`, each with a stable `code` matching the OpenAPI `ErrorResponse.error.code` enum.
-- [ ] T012 [P] Implement Postgres pool factory in `src/db/pool.ts`: reads `DATABASE_URL` from `Env`, exports a singleton `Pool`, exposes `withTransaction(fn)` helper used by reset-confirmation.
-- [ ] T013 Author migration `src/db/migrations/001_users.sql` creating `users (id UUID PK, email_normalized TEXT UNIQUE NOT NULL, email_display TEXT NOT NULL, password_hash TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), last_login_at TIMESTAMPTZ NULL)` per `data-model.md`.
-- [ ] T014 Author migration `src/db/migrations/002_sessions.sql` creating `sessions (jti UUID PK, user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, issued_at TIMESTAMPTZ NOT NULL DEFAULT now(), expires_at TIMESTAMPTZ NOT NULL, revoked_at TIMESTAMPTZ NULL, revoked_reason TEXT NULL CHECK (revoked_reason IN ('logout','password_change','admin')))` and `INDEX (user_id, expires_at)`.
-- [ ] T015 Author migration `src/db/migrations/003_password_reset_requests.sql` creating `password_reset_requests (id UUID PK, user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, token_hash BYTEA NOT NULL UNIQUE, issued_at TIMESTAMPTZ NOT NULL DEFAULT now(), expires_at TIMESTAMPTZ NOT NULL, consumed_at TIMESTAMPTZ NULL, superseded_at TIMESTAMPTZ NULL)` and partial index `(user_id) WHERE consumed_at IS NULL AND superseded_at IS NULL`.
-- [ ] T016 [P] Implement zod validation middleware in `src/middleware/validate.ts`: factory `validate(schema)` that parses `req.body`/`req.query`/`req.params`, attaches the typed result to `req.valid`, and throws `ValidationError` with `details[]` on failure.
-- [ ] T017 [P] Implement central error handler in `src/middleware/errorHandler.ts`: maps every `DomainError` subclass to its HTTP status (400/401/409/410/429), returns the OpenAPI `ErrorResponse` shape, logs the error via the redacted logger, and never leaks stack traces in production.
-- [ ] T018 [P] Implement rate-limit middleware factory in `src/middleware/rateLimit.ts` using `express-rate-limit`: exports `loginLimiter`, `registerLimiter`, `resetRequestLimiter` with thresholds tunable via env (defaults from `research.md` §4); on limit hit it MUST throw `RateLimitedError` with `Retry-After` set, satisfying FR-016.
-- [ ] T019 [P] Implement `requireSession` middleware in `src/middleware/requireSession.ts`: verifies the `Authorization: Bearer <jwt>` header, decodes via `tokenService`, looks up the `sessions` row by `jti`, asserts `revoked_at IS NULL` and `expires_at > now()`, attaches `req.user = { id }`; throws `UnauthenticatedError` otherwise.
-- [ ] T020 Wire the Express application in `src/app.ts`: `pino-http`, JSON body parser with 100 KB limit, mount routers (registered in later phases via `app.use`), then mount `errorHandler` last; export `createApp(deps)` so tests can inject a test pool/transport.
-- [ ] T021 Implement process entry point in `src/index.ts`: load env, build pool, build app via `createApp`, listen on `Env.PORT`, install SIGTERM handler that drains the pool.
-- [ ] T022 [P] Implement test DB helper in `tests/integration/helpers/testDb.ts`: connects to a Postgres instance via `TEST_DATABASE_URL`, runs migrations once per Jest run, exposes `truncateAll()` to be called from `beforeEach`.
-- [ ] T023 [P] Implement test app helper in `tests/integration/helpers/testApp.ts`: builds the app via `createApp` with the test pool and an in-memory email transport, returns a `supertest` agent.
+### Test scaffolding (built before any production code per §1 TDD)
 
-**Checkpoint**: `npm run typecheck`, `npm run lint`, and `npm test` all pass against the still-empty business surface; user-story phases may now begin in parallel.
+- [X] T009 [P] Create `tests/integration/helpers/testDb.ts` — boots a disposable Postgres (testcontainers or dedicated DB), runs migrations, exposes `withTransaction()` for per-test rollback (constitution §8, §9)
+- [X] T010 [P] Create `tests/integration/helpers/testApp.ts` — builds the Express app against the test DB and returns a Supertest agent
+- [ ] T011 [P] Create `tests/unit/helpers/fakeUsersRepo.ts`, `tests/unit/helpers/fakeSessionsRepo.ts`, and `tests/unit/helpers/fakeResetRequestsRepo.ts` — in-memory `Map`-backed implementations of the repo interfaces (constitution §6 Fake)
+- [ ] T012 [P] Create `tests/unit/helpers/fakeClock.ts` and `tests/unit/helpers/fakeEmailService.ts` (mock for nodemailer interactions) (constitution §6 Mock, Stub)
+- [ ] T013 [P] Create `tests/fixtures/users.ts`, `tests/fixtures/passwords.ts` (valid/invalid samples per FR-003), and `tests/fixtures/jwts.ts` — typed constants, never mutated by tests (constitution §6 fixtures)
+- [ ] T014 [P] Create `tests/unit/helpers/factories.ts` exporting `createTestUser(overrides?)`, `setupMockAPI()`, and `buildAuthenticatedAgent(agent, user)` (constitution §6 helpers)
 
----
+### Database & shared infrastructure
 
-## Phase 3: User Story 1 - Register a new account with email and password (Priority: P1) 🎯 MVP
+- [X] T015 Verify SQL migrations exist and match data-model.md: `src/db/migrations/001_users.sql`, `002_sessions.sql`, `003_password_reset_requests.sql` — add any missing columns/indexes (UNIQUE `email_normalized`, `INDEX (user_id, expires_at)`, partial index on unconsumed reset rows)
+- [X] T016 [P] Implement typed env loader in `src/config/env.ts` using `zod` (DATABASE_URL, JWT_SECRET ≥32 bytes, BCRYPT_COST, PUBLIC_URL, SMTP_URL, PORT)
+- [X] T017 [P] Implement PostgreSQL pool factory in `src/db/pool.ts`
+- [X] T018 [P] Implement domain error types in `src/lib/errors.ts` (`ValidationError`, `ConflictError`, `UnauthenticatedError`, `RateLimitedError`, `InvalidResetTokenError`)
+- [X] T019 [P] Implement `pino` logger in `src/lib/logger.ts` with redaction list including `password`, `newPassword`, `token`, `Authorization`, `password_hash` (FR-017, §11)
+- [X] T020 Wire base Express app in `src/app.ts` (helmet defaults, JSON body limit, request-id middleware, error handler last); leave routes empty for now
+- [X] T021 [P] Add `src/middleware/errorHandler.ts` mapping domain errors → safe HTTP payloads per OpenAPI `ErrorResponse` schema
+- [X] T022 [P] Add `src/middleware/validate.ts` — `zod` schema → 400 mapping helper
+- [X] T023 [P] Add `src/middleware/rateLimit.ts` — per-endpoint `express-rate-limit` configs (FR-016)
 
-**Goal**: A new visitor can POST `/auth/register` with email + password, the account is persisted, and the response contains a usable 24-hour JWT session that grants access to `/auth/me`.
-
-**Independent Test**: Run `tests/e2e/register.test.ts`: register a fresh email, hit `/auth/me` with the returned token, expect 200 and the same email; register the same email again, expect 409.
-
-### Tests for User Story 1
-
-> Write these tests FIRST and confirm they fail before the implementation tasks below.
-
-- [ ] T024 [P] [US1] Unit tests in `tests/unit/passwordService.test.ts`: covers `hash()` produces a bcrypt string at the configured cost, `verify()` returns true for the correct password and false for a wrong one, `isStrong()` accepts compliant passwords and rejects too-short / all-letters samples (FR-003, FR-005).
-- [ ] T025 [P] [US1] Unit tests in `tests/unit/tokenService.test.ts`: `issue({ userId, jti })` returns a JWT whose decoded `sub`/`jti`/`iat`/`exp` match expectations and `exp - iat === 24 * 3600` (FR-008); `verify()` rejects tampered tokens and tokens signed with a different secret.
-- [ ] T026 [P] [US1] Integration test in `tests/integration/auth.register.test.ts`: covers acceptance scenarios 1–4 of US1 — happy path (201 + token + 200 on `/auth/me`), duplicate email returns 409 with code `email_taken`, weak password returns 400, malformed email returns 400.
-- [ ] T027 [P] [US1] Integration test in `tests/integration/auth.register.rateLimit.test.ts`: 11 register attempts from the same IP in one hour; the 11th MUST receive 429 with a `Retry-After` header (FR-016).
-
-### Implementation for User Story 1
-
-- [ ] T028 [P] [US1] Implement `passwordService` in `src/services/passwordService.ts` exporting `hash(plain)`, `verify(plain, hash)`, `isStrong(plain)`, with JSDoc per constitution principle IV.
-- [ ] T029 [P] [US1] Implement `tokenService` in `src/services/tokenService.ts` exporting `issue({ userId, jti })` and `verify(token)` using `jsonwebtoken` HS256 and `Env.JWT_SECRET`; never log the token.
-- [ ] T030 [P] [US1] Implement `usersRepo` in `src/db/repositories/usersRepo.ts` exporting `insert({ emailNormalized, emailDisplay, passwordHash })`, `findByEmail(emailNormalized)`, `updatePasswordHash(userId, hash)`, `touchLastLogin(userId)`. All queries parameterized.
-- [ ] T031 [P] [US1] Implement `sessionsRepo` in `src/db/repositories/sessionsRepo.ts` exporting `insert({ jti, userId, issuedAt, expiresAt })`, `findActiveByJti(jti)` (returns row only when `revoked_at IS NULL` and `expires_at > now()`), `revokeByJti(jti, reason)`, `revokeAllForUser(userId, reason)`.
-- [ ] T032 [P] [US1] Define request schema in `src/routes/schemas/registerSchema.ts`: zod object `{ email: z.string().trim().toLowerCase().email().max(254), password: z.string().min(8).max(200) }` matching the OpenAPI `RegisterRequest` (FR-002, FR-003).
-- [ ] T033 [US1] Implement `registrationService` in `src/services/registrationService.ts` exporting `register({ email, password })`: normalizes email, calls `passwordService.isStrong` (throws `ValidationError`), `passwordService.hash`, `usersRepo.insert` (catches Postgres unique_violation → throws `EmailTakenError`), then `sessionService.start(userId)` and returns `{ token, expiresAt, user }` (FR-001, FR-004, FR-005). Depends on T028, T030, T035.
-- [ ] T034 [US1] Implement `sessionService` shell in `src/services/sessionService.ts` exporting `start(userId)`: generates a UUID `jti`, computes `expiresAt = now + 24h`, calls `sessionsRepo.insert`, calls `tokenService.issue`, returns `{ token, expiresAt }` (FR-008). Depends on T029, T031.
-- [ ] T035 [US1] Mount `POST /auth/register` and `GET /auth/me` in `src/routes/authRoutes.ts` (and `src/routes/meRoutes.ts`): apply `registerLimiter` + `validate(registerSchema)` to register; apply `requireSession` to `/auth/me`; both call `registrationService.register` / a `meService.fetch(req.user.id)` respectively. Depends on T033, T019, T018.
-- [ ] T036 [US1] Wire the auth router into `createApp` in `src/app.ts` so the new endpoints are reachable.
-
-**Checkpoint**: User Story 1 is independently demoable — `curl` register → 201, then `/auth/me` with the returned bearer token → 200; duplicate email → 409; weak password → 400.
+**Checkpoint**: Foundation ready. App boots against test DB, helpers/fakes/fixtures available, but no auth endpoints implemented.
 
 ---
 
-## Phase 4: User Story 2 - Sign in to an existing account and stay signed in for 24 hours (Priority: P1)
+## Phase 3: User Story 1 — Register a new account (Priority: P1) 🎯 MVP
 
-**Goal**: An existing user can POST `/auth/login` with valid credentials and receive a 24-hour JWT; invalid credentials return a generic 401; the session expires after 24 hours; explicit `POST /auth/logout` invalidates the session immediately.
+**Goal**: A visitor with a valid email and a policy-compliant password can register, be signed in, and reach `/auth/me`.
 
-**Independent Test**: Run `tests/e2e/loginLogout.test.ts`: register → logout invalidates the original token → login with the same credentials → `/auth/me` works → mock the clock 25 h forward → `/auth/me` returns 401 with code `unauthenticated`.
+**Independent Test**: Submit registration with a fresh email/password pair → response 201 with a session token → `GET /auth/me` with that token returns the user.
 
-### Tests for User Story 2
+> **TDD**: Every test task below MUST be written, run, and observed RED before its paired implementation task.
 
-- [ ] T037 [P] [US2] Unit tests in `tests/unit/sessionService.test.ts`: covers `start()` produces 24-hour `expiresAt`, `revoke(jti)` marks the row revoked, `isActive(jti)` returns false after revocation and false past `expires_at` (FR-008, FR-009).
-- [ ] T038 [P] [US2] Integration test in `tests/integration/auth.login.test.ts`: acceptance scenarios 1–4 of US2 — valid credentials → 200 + token + accessible `/auth/me`; invalid password → 401 with code `invalid_credentials` and identical message to "unknown email" path; clock-mocked 24 h elapsed → 401; valid mid-window → 200.
-- [ ] T039 [P] [US2] Integration test in `tests/integration/auth.logout.test.ts`: acceptance scenario 5 of US2 — login, call `POST /auth/logout` → 204, then call `/auth/me` with the same token → 401.
-- [ ] T040 [P] [US2] Integration test in `tests/integration/auth.login.rateLimit.test.ts`: 6 wrong-password attempts on the same email within 15 minutes → 6th returns 429 with `Retry-After`; a successful login resets the counter (FR-016).
+### RED — Unit tests for US1 (constitution §3 mirror layout)
 
-### Implementation for User Story 2
+- [X] T024 [P] [US1] Write failing unit tests for `passwordService` in `tests/unit/services/passwordService.test.ts` — strength policy (FR-003: ≥8 chars, ≥1 non-alpha), `hash()` produces bcrypt format with configured cost, `verify()` returns true/false, plaintext never returned (oracle from spec FR-003, FR-005)
+- [X] T025 [P] [US1] Write failing unit tests for `tokenService` in `tests/unit/services/tokenService.test.ts` — `issue()` signs HS256 (never `alg: none`), encodes `sub`/`jti`/`iat`/`exp`, `verify()` rejects tampered signature and expired tokens (§11 token handling)
+- [X] T026 [P] [US1] Write failing unit tests for `registrationService` in `tests/unit/services/registrationService.test.ts` using fakes from T011 — normalizes email (lower+trim per FR-002), persists hashed password (never plaintext), throws `ConflictError` on duplicate `email_normalized` (FR-004), throws `ValidationError` on weak password
+- [X] T027 [P] [US1] Write failing unit tests for `sessionService.create()` in `tests/unit/services/sessionService.test.ts` — issues `expires_at = issued_at + 24h` (FR-008) using `fakeClock`
+- [X] T028 [P] [US1] Write failing unit tests for `usersRepo` in `tests/unit/db/repositories/usersRepo.test.ts` using a fake/mocked `pg` client — `findByEmailNormalized`, `insert`, `updateLastLoginAt`
+- [X] T029 [P] [US1] Write failing unit tests for the register-route zod schema in `tests/unit/routes/schemas/registerSchema.test.ts` — accepts valid input, rejects each documented violation (invalid email, short password, missing fields) per OpenAPI `RegisterRequest`
 
-- [ ] T041 [P] [US2] Define request schema in `src/routes/schemas/loginSchema.ts`: zod object identical in shape to register but typed separately for clarity.
-- [ ] T042 [US2] Extend `sessionService` in `src/services/sessionService.ts` with `revoke(jti, reason)` and `revokeAllForUser(userId, reason)` delegating to `sessionsRepo` (supports FR-009 and FR-015). Depends on T031, T034.
-- [ ] T043 [US2] Implement `loginService` in `src/services/loginService.ts` exporting `login({ email, password })`: looks up user, runs `passwordService.verify` even when the user is not found (constant-time-ish to keep timing roughly equal), throws `InvalidCredentialsError` with the same message in both not-found and bad-password branches (FR-007), on success calls `usersRepo.touchLastLogin` then `sessionService.start`. Depends on T028, T030, T034.
-- [ ] T044 [US2] Mount `POST /auth/login` in `src/routes/authRoutes.ts` with `loginLimiter` + `validate(loginSchema)` + handler calling `loginService.login`; on success the limiter MUST be reset for that key. Depends on T043, T018.
-- [ ] T045 [US2] Mount `POST /auth/logout` in `src/routes/authRoutes.ts` behind `requireSession`; handler calls `sessionService.revoke(req.user.jti, 'logout')` and returns 204. Depends on T042, T019.
+### RED — Integration tests for US1 (group by feature; §3, §10)
 
-**Checkpoint**: User Stories 1 and 2 together deliver the full sign-up / sign-in / sign-out / session-expiry slice.
+- [X] T030 [US1] Write failing integration test `tests/integration/auth.register.test.ts` covering OpenAPI `POST /auth/register` contract: 201 with `SessionResponse` body shape, 400 on schema violation, 409 on duplicate email, response shape matches OpenAPI (constitution §10 contract testing)
+- [X] T031 [US1] Write failing integration test `tests/integration/auth.register.rateLimit.test.ts` — exceeding the limit returns 429 plus `Retry-After` header (§11)
+- [X] T032 [US1] Write failing integration test `tests/integration/auth.register.security.test.ts` — registering a user never serializes `password_hash` in any response; pino log capture shows no plaintext password (FR-005, FR-017, §11)
 
----
+### GREEN — Implementation for US1
 
-## Phase 5: User Story 3 - Reset a forgotten password via email (Priority: P2)
+- [X] T033 [P] [US1] Implement `src/services/passwordService.ts` (bcrypt hash/verify, strength policy) to make T024 pass
+- [X] T034 [P] [US1] Implement `src/services/tokenService.ts` (JWT issue/verify, jti generation) to make T025 pass
+- [X] T035 [P] [US1] Implement `src/db/repositories/usersRepo.ts` to make T028 pass
+- [X] T036 [US1] Implement `src/services/sessionService.ts` `create()` (depends on T034) to make T027 pass
+- [X] T037 [US1] Implement `src/services/registrationService.ts` (depends on T033, T035, T036) to make T026 pass
+- [X] T038 [P] [US1] Implement `src/routes/schemas/registerSchema.ts` to make T029 pass
+- [X] T039 [US1] Implement `POST /auth/register` handler in `src/routes/authRoutes.ts` (depends on T037, T038, T021–T023) to make T030 and T032 pass
+- [X] T040 [US1] Wire `express-rate-limit` config for `/auth/register` in `src/middleware/rateLimit.ts` to make T031 pass
+- [X] T041 [US1] Implement `GET /auth/me` minimum in `src/routes/meRoutes.ts` and `src/middleware/requireSession.ts` (needed by US1 independent-test criterion); write paired failing unit test for `requireSession` in `tests/unit/middleware/requireSession.test.ts` first
 
-**Goal**: A user can POST `/auth/password-reset/request` and (if their email is registered) receive a single-use reset link valid for 1 hour. POSTing the token + new password to `/auth/password-reset/confirm` updates the password atomically and revokes every existing session for that user.
+### REFACTOR & docs — US1
 
-**Independent Test**: Run `tests/e2e/passwordReset.test.ts`: register → request reset → grab the token from the in-memory email transport → confirm with a new password → old password rejected, new password works, any pre-existing session token rejected.
+- [ ] T042 [US1] Add JSDoc with `@param`, `@returns`, `@throws`, and one `@example` to every exported symbol added in T033–T041 (constitution Principle IV)
+- [ ] T043 [US1] Run mutation testing on touched files: `npm run test:mutation -- --mutate "src/services/{passwordService,tokenService,registrationService,sessionService}.ts,src/routes/schemas/registerSchema.ts"` and triage surviving mutants until score ≥ 75% (§7)
 
-### Tests for User Story 3
-
-- [ ] T046 [P] [US3] Unit tests in `tests/unit/resetService.test.ts`: covers token generation length (≥32 bytes) and hash storage (raw token never returned in responses), redemption rejects expired / consumed / superseded tokens (FR-012, FR-013), and "request for unknown email" returns success without sending (FR-010).
-- [ ] T047 [P] [US3] Integration test in `tests/integration/auth.passwordReset.test.ts`: acceptance scenarios 1–5 of US3 — registered email gets an email and a 202; unregistered email gets the same 202 and no email; valid token + strong password → 204 and login with new password works; reused/expired/superseded token → 410 with code `reset_token_invalid`; successful reset revokes existing sessions (FR-015).
-- [ ] T048 [P] [US3] Integration test in `tests/integration/auth.passwordReset.rateLimit.test.ts`: 4 reset requests for the same email within an hour → 4th returns 429 with `Retry-After` (FR-016).
-- [ ] T049 [P] [US3] Unit test in `tests/unit/logger.redaction.test.ts`: feeds objects containing `password`, `newPassword`, `token`, and an `Authorization` header into the pino logger and asserts each is replaced with `[Redacted]` in the serialized output (FR-017).
-
-### Implementation for User Story 3
-
-- [ ] T050 [P] [US3] Implement `resetRequestsRepo` in `src/db/repositories/resetRequestsRepo.ts`: `insert({ userId, tokenHash, issuedAt, expiresAt })`, `findRedeemable(tokenHash)` (returns row only when `consumed_at IS NULL AND superseded_at IS NULL AND expires_at > now()`), `markConsumed(id)`, `supersedeAllForUser(userId)`.
-- [ ] T051 [P] [US3] Define `EmailTransport` interface and implementations in `src/services/emailService.ts`: `SmtpEmailTransport` (nodemailer), `FileEmailTransport` (writes to `./tmp/emails/`), `MemoryEmailTransport` (test); a `buildResetEmail({ to, link })` template renders subject + plain-text body that contains the link.
-- [ ] T052 [P] [US3] Define request schemas in `src/routes/schemas/resetSchemas.ts`: `resetRequestSchema` `{ email }` and `resetConfirmSchema` `{ token: z.string().min(32).max(64), newPassword: z.string().min(8).max(200) }` matching the OpenAPI components.
-- [ ] T053 [US3] Implement `resetService.requestReset({ email })` in `src/services/resetService.ts`: looks up user; if absent returns success silently (FR-010); if present supersedes any prior unused requests (FR-013), generates a 32-byte random token, stores SHA-256 hash with 1 h expiry (FR-012), sends email via the injected transport with link `${Env.PUBLIC_URL}/reset?token=<base64url>`. Raw token MUST NEVER appear in logs (FR-017). Depends on T050, T051.
-- [ ] T054 [US3] Implement `resetService.confirmReset({ token, newPassword })` in `src/services/resetService.ts`: enforces `passwordService.isStrong`, hashes the supplied token, runs a single `withTransaction` that calls `resetRequestsRepo.findRedeemable` (throws `ResetTokenInvalidError` on miss), `resetRequestsRepo.markConsumed`, `usersRepo.updatePasswordHash`, and `sessionsRepo.revokeAllForUser(userId, 'password_change')` (FR-014, FR-015). Depends on T028, T030, T031, T050, T012.
-- [ ] T055 [US3] Mount `POST /auth/password-reset/request` and `POST /auth/password-reset/confirm` in `src/routes/authRoutes.ts` with `resetRequestLimiter` + the relevant zod schemas; both handlers always return the OpenAPI-defined status (202 / 204) on success and rely on `errorHandler` for 410/429. Depends on T053, T054, T018.
-
-**Checkpoint**: All three user stories are individually demoable and independently testable.
+**Checkpoint**: User Story 1 fully functional and independently testable — a fresh user can register and authenticate `/auth/me`.
 
 ---
 
-## Phase 6: Polish & Cross-Cutting Concerns
+## Phase 4: User Story 2 — Sign in, 24-hour session, sign out (Priority: P1)
 
-**Purpose**: Items that span stories and complete the constitution gates.
+**Goal**: A registered user can sign in to get a 24-hour session, use `/auth/me`, and explicitly log out which immediately invalidates the session.
 
-- [ ] T056 [P] Run `quickstart.md` end-to-end against a fresh clone (Docker Postgres, `npm test`, manual `curl` happy path) and capture any drift in the doc.
-- [ ] T057 [P] Add a single end-to-end test in `tests/e2e/happyPath.test.ts` exercising register → login → request reset → confirm reset → login with new password → old password rejected (mirrors quickstart §6).
-- [ ] T058 [P] Generate and check in JSDoc lint report; ensure every exported symbol in `src/services/**`, `src/middleware/**`, and `src/db/repositories/**` has `@param`, `@returns`, `@throws` (constitution principle IV).
-- [ ] T059 Confirm Jest coverage report shows ≥80% lines AND ≥80% branches on `src/services/**`, `src/db/repositories/**`, `src/middleware/**`; raise targeted unit tests for any gaps.
-- [ ] T060 Add CI workflow at `.github/workflows/ci.yml` that runs `npm run lint && npm run typecheck && npm test`, services a Postgres 16 container, fails on coverage threshold breach (matches Engineering Constraints in the constitution).
+**Independent Test**: Register via US1 → POST `/auth/login` with same creds → 200 + token → `/auth/me` 200 → advance clock to 24h+1m → `/auth/me` 401 → register fresh user, log in, POST `/auth/logout` → `/auth/me` with that token 401.
+
+### RED — Unit tests for US2
+
+- [ ] T044 [P] [US2] Write failing unit tests for `loginService` in `tests/unit/services/loginService.test.ts` using fakes — returns a session on valid credentials, throws `UnauthenticatedError` (generic message) on wrong password AND on unknown email (FR-007), updates `last_login_at` on success
+- [ ] T045 [P] [US2] Extend `tests/unit/services/sessionService.test.ts` — `verify(jti)` returns active session; returns null for revoked/expired rows; `revoke(jti, reason)` sets `revoked_at` and `revoked_reason` (FR-009, FR-015, §11)
+- [ ] T046 [P] [US2] Write failing unit tests for `sessionsRepo` in `tests/unit/db/repositories/sessionsRepo.test.ts` — `insert`, `findByJti`, `markRevoked`, `revokeAllForUser`
+- [ ] T047 [P] [US2] Write failing unit tests for `loginSchema` in `tests/unit/routes/schemas/loginSchema.test.ts` covering OpenAPI `LoginRequest`
+- [ ] T048 [P] [US2] Extend `tests/unit/middleware/requireSession.test.ts` — rejects missing header, malformed bearer, expired JWT, valid JWT whose session row is revoked, valid JWT whose session row has `expires_at` in the past (FR-008, FR-009, §11 authorization negative paths)
+
+### RED — Integration tests for US2
+
+- [ ] T049 [US2] Write failing integration test `tests/integration/auth.login.test.ts` covering OpenAPI `POST /auth/login` — 200 with `SessionResponse`; 401 generic on wrong password; 401 generic on unknown email (assert identical body and timing class); 400 on schema violation
+- [ ] T050 [US2] Write failing integration test `tests/integration/auth.login.rateLimit.test.ts` — exceeded limit returns 429 + `Retry-After` (FR-016, §11)
+- [ ] T051 [US2] Write failing integration test `tests/integration/auth.login.sessionExpiry.test.ts` — using `jest.useFakeTimers()`, advance >24h after login and assert `/auth/me` returns 401 (FR-008, SC-005)
+- [ ] T052 [US2] Write failing integration test `tests/integration/auth.logout.test.ts` covering OpenAPI `POST /auth/logout` — 204 on success; the same token returns 401 on `/auth/me` afterwards (FR-009); 401 when called without a session
+- [ ] T053 [US2] Write failing integration test `tests/integration/auth.me.test.ts` — `GET /auth/me` returns `UserResponse` for a valid session; 401 for missing/expired/revoked
+
+### GREEN — Implementation for US2
+
+- [ ] T054 [P] [US2] Implement `src/db/repositories/sessionsRepo.ts` to make T046 pass
+- [ ] T055 [US2] Extend `src/services/sessionService.ts` with `verify()`, `revoke()`, `revokeAllForUser()` (depends on T054) to make T045 pass
+- [ ] T056 [US2] Implement `src/services/loginService.ts` (depends on T033, T034, T035, T055) to make T044 pass
+- [ ] T057 [P] [US2] Implement `src/routes/schemas/loginSchema.ts` to make T047 pass
+- [ ] T058 [US2] Implement `POST /auth/login` in `src/routes/authRoutes.ts` (depends on T056, T057) to make T049 and T051 pass
+- [ ] T059 [US2] Wire `express-rate-limit` for `/auth/login` in `src/middleware/rateLimit.ts` to make T050 pass
+- [ ] T060 [US2] Implement `POST /auth/logout` in `src/routes/authRoutes.ts` (depends on T055) to make T052 pass
+- [ ] T061 [US2] Finalize `src/middleware/requireSession.ts` (depends on T055) to make T048 and T053 pass
+- [ ] T062 [US2] Confirm `GET /auth/me` returns the `UserResponse` shape per OpenAPI to make T053 pass
+
+### REFACTOR & docs — US2
+
+- [ ] T063 [US2] Add/update JSDoc on all symbols touched in T054–T062 (Principle IV)
+- [ ] T064 [US2] Run mutation testing on `src/services/{loginService,sessionService}.ts` and `src/middleware/requireSession.ts`; triage to ≥ 75% (§7)
+
+**Checkpoint**: Stories 1 and 2 both fully functional and independently testable.
+
+---
+
+## Phase 5: User Story 3 — Password reset via email (Priority: P2)
+
+**Goal**: A user can request a reset email, follow the link, set a new password, and sign in with it; old sessions are invalidated; the system never reveals whether an email is registered.
+
+**Independent Test**: Register via US1 → POST `/auth/password-reset/request` with the email → capture token from `fakeEmailService` → POST `/auth/password-reset/confirm` → login with old password = 401 → login with new password = 200; older sessions for that account are revoked.
+
+### RED — Unit tests for US3
+
+- [ ] T065 [P] [US3] Write failing unit tests for `resetService.request()` in `tests/unit/services/resetService.test.ts` — issues SHA-256 hashed token with 1h expiry (FR-012), supersedes prior unused requests (FR-013), invokes `emailService.send()` only when user exists, returns the same `Ack` shape regardless (FR-010)
+- [ ] T066 [P] [US3] Extend `tests/unit/services/resetService.test.ts` with `confirm()` cases — accepts unused unexpired token; rejects consumed/superseded/expired/tampered tokens with `InvalidResetTokenError`; updates `password_hash`; revokes all sessions for the user with reason `password_change` (FR-014, FR-015) — runs transactionally
+- [ ] T067 [P] [US3] Write failing unit tests for `resetRequestsRepo` in `tests/unit/db/repositories/resetRequestsRepo.test.ts` — `insert`, `findByTokenHash`, `markConsumed`, `markSupersededForUser`
+- [ ] T068 [P] [US3] Write failing unit tests for `emailService` in `tests/unit/services/emailService.test.ts` using a mocked nodemailer transport — sends a reset email with the token in a URL built from `PUBLIC_URL`, asserts `toHaveBeenCalledWith` shape; does NOT include plaintext password or full DB row (FR-017)
+- [ ] T069 [P] [US3] Write failing unit tests for reset schemas in `tests/unit/routes/schemas/resetSchemas.test.ts` covering OpenAPI `ResetRequestRequest` and `ResetConfirmRequest`
+
+### RED — Integration tests for US3
+
+- [ ] T070 [US3] Write failing integration test `tests/integration/auth.passwordReset.request.test.ts` — `POST /auth/password-reset/request` returns 202 `AckResponse` for both registered and unregistered emails (FR-010); when registered, `fakeEmailService` recorded exactly one send
+- [ ] T071 [US3] Write failing integration test `tests/integration/auth.passwordReset.rateLimit.test.ts` — 429 + `Retry-After` after limit (FR-016)
+- [ ] T072 [US3] Write failing integration test `tests/integration/auth.passwordReset.confirm.test.ts` — happy path returns 204; replay returns 400/410; expired (>1h via fake clock) returns 400/410; superseded token returns 400/410; weak password returns 400 (FR-012, FR-013, FR-014)
+- [ ] T073 [US3] Write failing integration test `tests/integration/auth.passwordReset.sessionInvalidation.test.ts` — after a successful reset, all previously issued sessions for that user fail `/auth/me` with 401 (FR-015)
+
+### GREEN — Implementation for US3
+
+- [ ] T074 [P] [US3] Implement `src/db/repositories/resetRequestsRepo.ts` to make T067 pass
+- [ ] T075 [P] [US3] Implement `src/services/emailService.ts` (nodemailer transport, reset email template) to make T068 pass
+- [ ] T076 [US3] Implement `src/services/resetService.ts` (depends on T033, T055, T074, T075) — `request()` and `confirm()`, with `confirm()` running transactionally — to make T065 and T066 pass
+- [ ] T077 [P] [US3] Implement `src/routes/schemas/resetRequestSchema.ts` and `src/routes/schemas/resetConfirmSchema.ts` to make T069 pass
+- [ ] T078 [US3] Implement `POST /auth/password-reset/request` and `POST /auth/password-reset/confirm` in `src/routes/authRoutes.ts` (depends on T076, T077) to make T070 and T072 pass
+- [ ] T079 [US3] Wire `express-rate-limit` for both reset endpoints in `src/middleware/rateLimit.ts` to make T071 pass
+- [ ] T080 [US3] Verify session invalidation behavior end-to-end via T073
+
+### REFACTOR & docs — US3
+
+- [ ] T081 [US3] Add/update JSDoc on all symbols touched in T074–T080 (Principle IV)
+- [ ] T082 [US3] Run mutation testing on `src/services/{resetService,emailService}.ts`; triage to ≥ 75% (§7)
+
+**Checkpoint**: All three user stories independently functional and tested.
+
+---
+
+## Phase 6: End-to-End Journeys
+
+**Purpose**: Cover the highest-value cross-story journeys per constitution §3 (~10% E2E, grouped by user journey, `.spec.ts`).
+
+- [ ] T083 [P] Write E2E test `tests/e2e/register-and-login.spec.ts` — register → call `/auth/me` → logout → login again → `/auth/me` (covers US1+US2 happy path; oracle = quickstart.md §6)
+- [ ] T084 [P] Write E2E test `tests/e2e/password-reset.spec.ts` — register → request reset → consume token from `fakeEmailService` → confirm → old password fails → new password works → old session 401 (covers US3 + FR-015 across stories)
+- [ ] T085 [P] Write E2E test `tests/e2e/session-expiry.spec.ts` — register → login → advance clock >24h → `/auth/me` 401 (SC-005)
+
+> Note: The E2E tier may use Jest+Supertest until a Playwright config is added. If Playwright is adopted later, the same files (under `tests/e2e/`, `.spec.ts`) move to `playwright.config.ts` without rename.
+
+---
+
+## Phase 7: Polish & Cross-Cutting Concerns
+
+- [ ] T086 [P] Add `tests/unit/lib/logger.test.ts` asserting pino redaction of `password`, `newPassword`, `token`, `Authorization`, `password_hash` (FR-017, quickstart §7)
+- [ ] T087 [P] Add OpenAPI contract-drift check: a unit test in `tests/unit/contracts/openapi.test.ts` that parses `specs/001-user-auth-system/contracts/auth-api.openapi.yaml` and asserts every documented endpoint has a registered Express route (§10)
+- [ ] T088 [P] Verify global coverage ≥ 80% lines / ≥ 75% branches via `npm test -- --coverage`; raise tests for any uncovered branch in `src/services/**` or `src/middleware/**`
+- [ ] T089 [P] Run full Stryker run (`npm run test:mutation`) across `src/services/**` and `src/middleware/**`; mutation score ≥ 75% (§2, §7)
+- [ ] T090 [P] Audit `tests/**` for anti-patterns per §7: no `expect(x).toBe(x)`, no `.skip`/`.todo` without linked issue, no `console.log`, no test files split per source file at the unit tier (§3); fix or quarantine
+- [ ] T091 Performance sanity: unit suite ≤ 60 s, integration suite ≤ 5 min on the default CI runner (§12 performance budget); profile and split any slow file
+- [ ] T092 [P] Update `quickstart.md` smoke-test commands if any endpoint shape changed during implementation
+- [ ] T093 Run `quickstart.md` end-to-end manually as the final acceptance gate
 
 ---
 
 ## Dependencies & Execution Order
 
-### Phase Dependencies
+### Phase dependencies
 
-- **Setup (Phase 1)**: no dependencies; T001 first, then T002, then T003/T004 in parallel, then T005–T008 in parallel.
-- **Foundational (Phase 2)**: depends on Setup; BLOCKS all user-story phases.
-- **User stories (Phases 3–5)**: each depends only on Foundational; once Phase 2 is done they can run in parallel by different developers.
-- **Polish (Phase 6)**: depends on all desired user-story phases.
+- **Phase 1 (Setup)**: no deps; start immediately.
+- **Phase 2 (Foundational)**: depends on Phase 1; BLOCKS Phases 3–5.
+- **Phase 3 (US1)**: depends on Phase 2.
+- **Phase 4 (US2)**: depends on Phase 2; integrates with US1's `requireSession` and `tokenService` but is independently testable (its tests register a user inline).
+- **Phase 5 (US3)**: depends on Phase 2; uses `passwordService` from US1 and `sessionService.revokeAllForUser` from US2 — schedule after US2 unless those two are explicitly stubbed.
+- **Phase 6 (E2E)**: depends on Phases 3–5 completing the journey it covers.
+- **Phase 7 (Polish)**: depends on all desired stories being complete.
 
-### Within Each User Story
+### Within each user story (TDD discipline, constitution §1)
 
-- Tests are written FIRST and MUST fail before the matching implementation tasks land.
-- Repos before services; services before route mounts; route mount before user-facing curl/e2e demo.
+1. RED — write tests; observe failure (`npm run test:unit -- --testPathPattern '<file>'`).
+2. GREEN — implement minimum code to pass.
+3. REFACTOR — clean up; JSDoc; mutation run.
 
-### Cross-Story Dependencies
+### Parallel opportunities
 
-- US2 reuses `sessionService` and `passwordService` introduced in US1 (T028, T034). Either implement US1 first, or have the US2 developer stub these and rebase once US1 lands.
-- US3 reuses `usersRepo`, `sessionsRepo`, and `passwordService` introduced in US1 (T028, T030, T031) plus `sessionService.revokeAllForUser` extended in US2 (T042). US3 should land after US1; it can land in parallel with US2 if developers coordinate the `sessionService` interface.
+- Phase 1: T002, T003, T004, T006, T007, T008 in parallel after T001.
+- Phase 2: T009–T014 (test helpers/fixtures) all in parallel; T016–T019 and T021–T023 in parallel after T015 and T020.
+- Phase 3: RED tests T024–T029 all in parallel; implementation files T033, T034, T035, T038 in parallel (different files).
+- Phase 4: RED tests T044–T048 in parallel; implementation T054, T057 in parallel.
+- Phase 5: RED tests T065–T069 in parallel; implementation T074, T075, T077 in parallel.
+- Phase 6: T083–T085 all in parallel.
+- Phase 7: T086–T090 and T092 in parallel.
 
-### Parallel Opportunities
+### Cross-story parallelism
 
-- Phase 1: T005, T006, T007, T008 in parallel after T002.
-- Phase 2: T010, T011, T012 in parallel after T009; T013–T015 in parallel; T016, T017, T018, T019 in parallel after T009/T011; T022, T023 in parallel after T012.
-- Phase 3 (US1): T024, T025, T026, T027 in parallel before any implementation; T028, T029, T030, T031, T032 in parallel after their tests fail.
-- Phase 4 (US2): T037, T038, T039, T040 in parallel; T041 in parallel with T042.
-- Phase 5 (US3): T046, T047, T048, T049 in parallel; T050, T051, T052 in parallel.
-- Phase 6: T056, T057, T058 in parallel.
-
----
-
-## Parallel Example: Bringing User Story 1 to a green test run
-
-```bash
-# Step 1 — write the failing tests in parallel
-Task: "tests/unit/passwordService.test.ts"
-Task: "tests/unit/tokenService.test.ts"
-Task: "tests/integration/auth.register.test.ts"
-Task: "tests/integration/auth.register.rateLimit.test.ts"
-
-# Step 2 — implement leaf modules in parallel
-Task: "src/services/passwordService.ts"
-Task: "src/services/tokenService.ts"
-Task: "src/db/repositories/usersRepo.ts"
-Task: "src/db/repositories/sessionsRepo.ts"
-Task: "src/routes/schemas/registerSchema.ts"
-
-# Step 3 — wire the orchestrators (sequential, share files)
-Task: "src/services/sessionService.ts"
-Task: "src/services/registrationService.ts"
-Task: "src/routes/authRoutes.ts + src/app.ts"
-```
+After Phase 2, two engineers MAY work US2 and US3 in parallel by stubbing the cross-dependency (`sessionService.revokeAllForUser` is the only one) and integrating at T080.
 
 ---
 
 ## Implementation Strategy
 
-### MVP scope (recommended first cut)
+**MVP scope** = Phase 1 + Phase 2 + Phase 3 (US1 only). At the MVP checkpoint a fresh user can register and reach `/auth/me`. Ship this first, then layer US2 and US3.
 
-User Story 1 only: registration + immediately-usable session + `/auth/me`. Delivers a demoable account-creation flow and proves the bcrypt + JWT + sessions table chain works end-to-end. Phases 1 → 2 → 3, then stop and validate.
+**Incremental delivery checkpoints**:
 
-### Incremental delivery
+1. After T043 — MVP: registration + protected `/auth/me`.
+2. After T064 — Full P1: login, 24h session, logout.
+3. After T082 — P2: password reset with session invalidation.
+4. After T093 — Hardened release: contract test, coverage gate, mutation gate, quickstart green.
 
-1. Phases 1 + 2 → foundation green.
-2. Phase 3 (US1) → MVP demo.
-3. Phase 4 (US2) → full sign-in + session lifecycle.
-4. Phase 5 (US3) → password recovery shipped.
-5. Phase 6 → CI, docs, coverage gate.
+**Quality gates (per constitution §12, must pass on every PR)**:
 
-### Parallel team strategy
-
-After Phase 2 completes, three developers can take US1, US2, and US3 simultaneously, coordinating only on the `sessionService` interface (T034 + T042) and the auth router file (T035, T044, T045, T055), which should be merged carefully.
-
----
-
-## Notes
-
-- `[P]` tasks touch different files and have no incomplete dependencies; they may be assigned to different developers or run by an LLM in parallel.
-- Every `[USx]` task is traceable back to a user story in `spec.md`.
-- Tests are NOT optional in this project — constitution principle III blocks any merge that drops business-logic coverage below 80%.
-- Commit after each task or each tight group; the `git` extension's `after_implement` hook can auto-commit when enabled in `.specify/extensions/git/git-config.yml`.
-- Open clarifications: rate-limit thresholds in FR-016 are still qualitative in `spec.md` — the implementation tasks above use the working defaults from `research.md` §4 (5 failed logins / account / 15 min, 20 / IP / 15 min, 10 register / IP / hour, 3 reset-request / email / hour); finalize via `/speckit.clarify` before merging the rate-limit tests if stricter numbers are required.
+- `npm run typecheck` 0 errors
+- `npm run lint` 0 errors / 0 warnings
+- `npm run format:check`
+- `npm run test:unit`
+- `npm run test:integration`
+- `npm run test:e2e` (when applicable)
+- Coverage: lines ≥ 80%, branches ≥ 75%
+- Mutation score ≥ 75% (on `main`; nightly elsewhere)

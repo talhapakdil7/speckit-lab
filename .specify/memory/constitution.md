@@ -512,17 +512,17 @@ in this section are run with `npm`.
 **Execution commands** (npm scripts — every entry below MUST exist in
 `package.json`):
 
-| Purpose                | Command                          |
-|------------------------|----------------------------------|
-| Type check             | `npm run typecheck`              |
-| Lint                   | `npm run lint`                   |
-| Format check           | `npm run format:check`           |
-| Run all tests          | `npm test`                       |
-| Run unit tests         | `npm run test:unit`              |
-| Run integration tests  | `npm run test:integration`       |
-| Run E2E tests          | `npm run test:e2e`               |
-| Generate coverage      | `npm test -- --coverage`         |
-| Run mutation testing   | `npm run test:mutation`          |
+| Purpose               | Command                    |
+| --------------------- | -------------------------- |
+| Type check            | `npm run typecheck`        |
+| Lint                  | `npm run lint`             |
+| Format check          | `npm run format:check`     |
+| Run all tests         | `npm test`                 |
+| Run unit tests        | `npm run test:unit`        |
+| Run integration tests | `npm run test:integration` |
+| Run E2E tests         | `npm run test:e2e`         |
+| Generate coverage     | `npm test -- --coverage`   |
+| Run mutation testing  | `npm run test:mutation`    |
 
 The `test:mutation` script MUST invoke Stryker
 (`stryker run`) and MUST exit non-zero when the mutation score falls

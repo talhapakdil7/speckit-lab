@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Auth Demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      }
+      body {
+        max-width: 720px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        line-height: 1.4;
+      }
+      h1 {
+        margin-bottom: 0.25rem;
+      }
+      p.lead {
+        color: #666;
+        margin-top: 0;
+      }
+      section {
+        border: 1px solid #ccc4;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin: 1rem 0;
+      }
+      label {
+        display: block;
+        margin: 0.5rem 0 0.25rem;
+        font-weight: 600;
+      }
+      input {
+        width: 100%;
+        padding: 0.5rem;
+        font: inherit;
+        border: 1px solid #ccc6;
+        border-radius: 6px;
+        background: transparent;
+        color: inherit;
+        box-sizing: border-box;
+      }
+      button {
+        margin-top: 0.75rem;
+        padding: 0.55rem 1rem;
+        font: inherit;
+        border-radius: 6px;
+        border: 1px solid #4a90e2;
+        background: #4a90e2;
+        color: #fff;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: transparent;
+        color: #4a90e2;
+      }
+      pre {
+        background: #0001;
+        padding: 0.75rem;
+        border-radius: 6px;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .row {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        align-items: end;
+      }
+      .row > * {
+        flex: 1 1 200px;
+      }
+      .pill {
+        display: inline-block;
+        padding: 0.15rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        background: #4a90e22a;
+        color: #4a90e2;
+      }
+      .muted {
+        color: #888;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Auth Demo</h1>
+    <p class="lead">Backend smoke test for feature 001-user-auth-system.</p>
+    <p>
+      Status:
+      <span id="status" class="pill">checking…</span>
+      &nbsp;Token:
+      <span id="tokenStatus" class="muted">none</span>
+    </p>
+
+    <section>
+      <h2>Register</h2>
+      <div class="row">
+        <div>
+          <label for="regEmail">Email</label>
+          <input id="regEmail" type="email" value="demo@example.com" autocomplete="email" />
+        </div>
+        <div>
+          <label for="regPwd">Password</label>
+          <input id="regPwd" type="password" value="correcthorse9" autocomplete="new-password" />
+        </div>
+      </div>
+      <button id="btnRegister">POST /auth/register</button>
+      <pre id="regOut"></pre>
+    </section>
+
+    <section>
+      <h2>Who am I?</h2>
+      <p class="muted">Uses the most recent token returned by /auth/register.</p>
+      <button id="btnMe" class="secondary">GET /auth/me</button>
+      <pre id="meOut"></pre>
+    </section>
+
+    <section>
+      <h2>Logout</h2>
+      <p class="muted">Not yet implemented (US2). Coming when login/logout endpoints land.</p>
+    </section>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let token = null;
+
+      const setTokenStatus = () => {
+        $('tokenStatus').textContent = token ? token.slice(0, 16) + '…' : 'none';
+      };
+
+      async function checkHealth() {
+        try {
+          const r = await fetch('/health');
+          const j = await r.json();
+          $('status').textContent = j.status === 'ok' ? 'online' : 'unknown';
+        } catch {
+          $('status').textContent = 'offline';
+        }
+      }
+
+      $('btnRegister').addEventListener('click', async () => {
+        $('regOut').textContent = '...';
+        try {
+          const r = await fetch('/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: $('regEmail').value,
+              password: $('regPwd').value,
+            }),
+          });
+          const j = await r.json();
+          $('regOut').textContent = `HTTP ${r.status}\n` + JSON.stringify(j, null, 2);
+          if (r.ok && j.token) {
+            token = j.token;
+            setTokenStatus();
+          }
+        } catch (err) {
+          $('regOut').textContent = 'network error: ' + err.message;
+        }
+      });
+
+      $('btnMe').addEventListener('click', async () => {
+        $('meOut').textContent = '...';
+        try {
+          const r = await fetch('/auth/me', {
+            headers: token ? { Authorization: 'Bearer ' + token } : {},
+          });
+          const j = await r.json().catch(() => ({}));
+          $('meOut').textContent = `HTTP ${r.status}\n` + JSON.stringify(j, null, 2);
+        } catch (err) {
+          $('meOut').textContent = 'network error: ' + err.message;
+        }
+      });
+
+      checkHealth();
+      setTokenStatus();
+    </script>
+  </body>
+</html>
